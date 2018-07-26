@@ -5,9 +5,9 @@ import os
 from pyspark.ml import Pipeline
 from pyspark.ml.classification import GBTClassifier
 from pyspark.ml.classification import RandomForestClassifier
-from pyspark.ml.evaluation import BinaryClassificationEvaluator
+from pyspark.ml.evaluation import BinaryClassificationEvaluator, RegressionEvaluator
 from pyspark.ml.feature import StringIndexer, VectorIndexer, VectorAssembler
-from pyspark.ml.tuning import CrossValidator, ParamGridBuilder
+from pyspark.ml.tuning import CrossValidator, ParamGridBuilder, TrainValidationSplit
 from pyspark.sql import SparkSession
 
 
@@ -25,10 +25,20 @@ def random_forest_classifier(training_data, testing_data):
     feature_indexer = VectorIndexer(inputCol="features", outputCol="indexedFeatures", maxCategories=15).fit(
         training_data_vector)
 
-    rf = RandomForestClassifier(labelCol="indexedLabel", featuresCol="features", numTrees=90)
+    rf = RandomForestClassifier(labelCol="indexedLabel", featuresCol="features", numTrees=10)
     pipeline = Pipeline(stages=[label_indexer, feature_indexer, rf])
 
-    model = pipeline.fit(training_data_vector)
+    param_grid = ParamGridBuilder() \
+        .addGrid(feature_indexer.maxCategories, [5, 15, 25]) \
+        .addGrid(rf.numTrees, [10, 50, 100]) \
+        .addGrid(rf.maxDepth, [5, 10])
+
+    tvs = TrainValidationSplit(estimator=pipeline,
+                               estimatorParamMaps=param_grid,
+                               evaluator=RegressionEvaluator(),
+                               trainRatio=0.8)
+
+    model = tvs.fit(training_data_vector)
 
     testing_data_vector = assembler.transform(testing_data)
 
@@ -58,6 +68,7 @@ def gbt_classifier(training_data, testing_data):
 
     param_grid = ParamGridBuilder() \
         .addGrid(feature_indexer.maxCategories, [5, 10, 20]) \
+        .addGrid(rf.maxDepth, [5, 10]) \
         .addGrid(rf.maxIter, [10, 20]) \
         .build()
 
@@ -100,7 +111,7 @@ def __load_data():
                                     third.col5 as col22, third.col6 as col23, third.col7 as col24, third.col8 as col25, 
                                     bid, target 
                                     from test_stock""")
-    return (training_data, testing_data)
+    return training_data, testing_data
 
 
 def __output(model_type, selected):
