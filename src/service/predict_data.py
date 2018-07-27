@@ -31,7 +31,8 @@ def random_forest_classifier(training_data, testing_data):
     param_grid = ParamGridBuilder() \
         .addGrid(feature_indexer.maxCategories, [5, 15, 25]) \
         .addGrid(rf.numTrees, [10, 50, 100]) \
-        .addGrid(rf.maxDepth, [5, 10])
+        .addGrid(rf.maxDepth, [5, 10]) \
+        .build()
 
     tvs = TrainValidationSplit(estimator=pipeline,
                                estimatorParamMaps=param_grid,
